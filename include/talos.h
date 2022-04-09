@@ -25,6 +25,8 @@
 #include <set>
 #include <algorithm>
 
+#pragma warning(disable : 26812) // Disable enum class warning from Vulkan enums
+
 namespace Talos {
 
     // ---- STRUCTS ----
@@ -37,6 +39,7 @@ namespace Talos {
         std::vector<VkPresentModeKHR> presentModes;
     };
 
+    // Contains swapchain and related info
     struct SwapchainDetails {
         VkSwapchainKHR swapchain{};
         VkFormat imageFormat{};

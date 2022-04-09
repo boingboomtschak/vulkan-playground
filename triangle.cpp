@@ -1,4 +1,3 @@
-#pragma warning(disable : 26812) // Disable enum class warning from Vulkan enums
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vector>
@@ -10,6 +9,8 @@
 #include <limits>
 #include <algorithm>
 #include <fstream>
+
+#pragma warning(disable : 26812) // Disable enum class warning from Vulkan enums
 
 const uint32_t WIN_WIDTH = 800;
 const uint32_t WIN_HEIGHT = 800;
