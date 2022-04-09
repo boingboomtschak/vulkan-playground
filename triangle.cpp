@@ -17,6 +17,9 @@ const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+uint32_t currentFrame = 0;
+bool framebufferResized = false;
+
 GLFWwindow* window;
 VkInstance instance;
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -38,8 +41,6 @@ std::vector<VkCommandBuffer> commandBuffers;
 std::vector<VkSemaphore> imageAvailableSemaphores;
 std::vector<VkSemaphore> renderFinishedSemaphores;
 std::vector<VkFence> inFlightFences;
-
-uint32_t currentFrame = 0;
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily = std::nullopt;
@@ -68,6 +69,10 @@ static std::vector<char> readBinaryFile(const std::string& filename) {
 
 void kbdCallback(GLFWwindow* w, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(w, true);
+}
+
+void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+    framebufferResized = true;
 }
 
 QueueFamilyIndices getQueueFamilies(VkPhysicalDevice device) {
@@ -532,6 +537,32 @@ void createSyncObjects() {
     
 }
 
+void recreateSwapchain() {
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+    // Wait for device to idle
+    vkDeviceWaitIdle(logicalDevice);
+    // Clean up previous swapchain related resources
+    for (size_t i = 0; i < swapChainFramebuffers.size(); i++)
+        vkDestroyFramebuffer(logicalDevice, swapChainFramebuffers[i], nullptr);
+    vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
+    vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
+    for (size_t i = 0; i < swapChainImageViews.size(); i++)
+        vkDestroyImageView(logicalDevice, swapChainImageViews[i], nullptr);
+    vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
+    // Recreate swapchain and dependent resources
+    createSwapchain();
+    createImageViews();
+    createRenderPass();
+    createGraphicsPipeline();
+    createFramebuffers();
+}
+
 void allocateCommandBuffers() {
     commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
     VkCommandBufferAllocateInfo allocInfo{};
@@ -575,12 +606,20 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
 }
 
 void drawFrame() {
+    VkResult res;
     // Wait for frame to stop being in flight
     vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-    vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]);
     // Acquire next swapchain image
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(logicalDevice, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    res = vkAcquireNextImageKHR(logicalDevice, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || framebufferResized) {
+        framebufferResized = false;
+        recreateSwapchain();
+        return;
+    } else if (res != VK_SUCCESS)
+        throw std::runtime_error("Failed to acquire swapchain image!");
+    // Reset in flight fences so next frame can begin rendering
+    vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]);
     // Reset and record command buffer
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
     recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
@@ -597,7 +636,7 @@ void drawFrame() {
     submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
-    VkResult res = vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]);
+    res = vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]);
     if (res != VK_SUCCESS)
         throw std::runtime_error("Failed to submit draw command buffer!");
     // Present result to swapChain
@@ -622,6 +661,7 @@ int main() {
     window = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "Vulkan Playground", nullptr, nullptr);
     if (!window) { printf("Failed to create GLFW window! Exiting...\n"); glfwTerminate(); return 1; }
     glfwSetKeyCallback(window, kbdCallback);
+    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     // Vulkan setup
     createVkInstance();
     createSurface();
