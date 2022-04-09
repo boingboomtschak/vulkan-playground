@@ -1,3 +1,12 @@
+# Folders
 x64/
 .vscode/
+.vs/
+*.xcodeproj/
+# Files
 .DS_STORE
+*.vcxproj
+*.filters
+*.user
+*.xcodeproj
+*.sln
