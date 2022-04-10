@@ -1,6 +1,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 #include <vector>
+#include <array>
 #include <set>
 #include <string>
 #include <cstdio>
@@ -39,6 +41,8 @@ VkRenderPass renderPass;
 VkPipelineLayout pipelineLayout;
 VkPipeline graphicsPipeline;
 VkCommandPool commandPool;
+VkBuffer vertexBuffer;
+VkDeviceMemory vertexBufferMemory;
 std::vector<VkCommandBuffer> commandBuffers;
 std::vector<VkSemaphore> imageAvailableSemaphores;
 std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -54,6 +58,36 @@ struct SwapchainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities{};
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
+};
+
+struct Vertex {
+    glm::vec2 pos;
+    glm::vec3 color;
+    static VkVertexInputBindingDescription getBindingDescription() {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return bindingDescription;
+    }
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, color);
+        return attributeDescriptions;
+    }
+};
+
+const std::vector<Vertex> vertices = {
+    {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
 };
 
 static std::vector<char> readBinaryFile(const std::string& filename) {
@@ -138,6 +172,15 @@ bool isDeviceSuitable(VkPhysicalDevice device) {
         adequateSwapChain = !swapchainSupport.formats.empty() && !swapchainSupport.presentModes.empty();
     }
     return queueFamilyIndices.isComplete() && requiredExtensions.empty() && adequateSwapChain;
+}
+
+uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) 
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) 
+            return i;
+    throw std::runtime_error("Failed to find suitable memory type!");
 }
 
 VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -403,11 +446,13 @@ void createGraphicsPipeline() {
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
     // Create pipeline vertex input state info struct
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions = Vertex::getAttributeDescriptions();
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.size();
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
     // Create pipeline input assembly state info struct
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -449,7 +494,7 @@ void createGraphicsPipeline() {
     multisampler.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     // Create color blend attachment state info struct
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
     // Create color blend state info struct
     VkPipelineColorBlendStateCreateInfo colorBlending{};
@@ -517,6 +562,36 @@ void createCommandPool() {
     VkResult res = vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &commandPool);
     if (res != VK_SUCCESS)
         throw std::runtime_error("Failed to create command pool!");
+}
+
+void createVertexBuffer() {
+    VkResult res;
+    // Create vertex buffer
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = sizeof(Vertex) * vertices.size();
+    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    res = vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &vertexBuffer);
+    if (res != VK_SUCCESS)
+        throw std::runtime_error("Failed to create vertex buffer!");
+    // Allocate vertex buffer memory
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(logicalDevice, vertexBuffer, &memRequirements);
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    res = vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &vertexBufferMemory);
+    if (res != VK_SUCCESS)
+        throw std::runtime_error("Failed to allocate vertex buffer memory!");
+    // Bind vertex buffer memory to vertex buffer
+    vkBindBufferMemory(logicalDevice, vertexBuffer, vertexBufferMemory, 0);
+    // Copy vertices to vertex buffer
+    void* data;
+    vkMapMemory(logicalDevice, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+    memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+    vkUnmapMemory(logicalDevice, vertexBufferMemory);
 }
 
 void createSyncObjects() {
@@ -587,8 +662,8 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     res = vkBeginCommandBuffer(commandBuffer, &beginInfo);
     if (res != VK_SUCCESS)
         throw std::runtime_error("Failed to begin recording to command buffer!");
-    VkClearValue clearColor = {{{ 0.0f, 0.0f, 1.0f, 1.0f }}};
-    // Begin render pass
+    VkClearValue clearColor = {{{ 0.0f, 0.0f, 0.0f, 1.0f }}};
+    // Setup render pass
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
@@ -597,10 +672,17 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     renderPassInfo.renderArea.extent = swapchainExtent;
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
+    // Begin render pass
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    // Bind pipeline, draw points
+    // Bind graphics pipeline
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    // Bind vertex buffer
+    VkBuffer vertexBuffers[] = { vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    // Draw vertices
+    vkCmdDraw(commandBuffer, (uint32_t)vertices.size(), 1, 0, 0);
+    // End render pass
     vkCmdEndRenderPass(commandBuffer);
     res = vkEndCommandBuffer(commandBuffer);
     if (res != VK_SUCCESS)
@@ -674,6 +756,7 @@ int main() {
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
+    createVertexBuffer();
     allocateCommandBuffers();
     createSyncObjects();
     // Render loop
@@ -688,6 +771,8 @@ int main() {
         vkDestroySemaphore(logicalDevice, renderFinishedSemaphores[i], nullptr);
         vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
     }
+    vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
+    vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
     vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
     for (VkFramebuffer framebuffer : swapchainFramebuffers)
         vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
