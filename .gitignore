@@ -2,6 +2,7 @@
 x64/
 .vscode/
 .vs/
+lib/
 *.xcodeproj/
 # Files
 .DS_STORE

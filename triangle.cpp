@@ -42,6 +42,8 @@ VkPipeline graphicsPipeline;
 VkCommandPool commandPool;
 VkBuffer vertexBuffer;
 VkDeviceMemory vertexBufferMemory;
+VkBuffer indexBuffer;
+VkDeviceMemory indexBufferMemory;
 std::vector<VkCommandBuffer> commandBuffers;
 std::vector<VkSemaphore> imageAvailableSemaphores;
 std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -84,9 +86,14 @@ struct Vertex {
 };
 
 const std::vector<Vertex> vertices = {
-    {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+    0, 1, 2, 2, 3, 0
 };
 
 static std::vector<char> readBinaryFile(const std::string& filename) {
@@ -122,11 +129,11 @@ QueueFamilyIndices getQueueFamilies(VkPhysicalDevice device) {
     // Check for queue families with graphics and presentation support
     for (uint32_t i = 0; i < queueFamilyCount; i++) {
         if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            queueFamilyIndices.graphicsFamily = i;
+            queueFamilyIndices.graphicsFamily = std::make_optional(i);
         VkBool32 present = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &present);
         if (present)
-            queueFamilyIndices.presentFamily = i;
+            queueFamilyIndices.presentFamily = std::make_optional(i);
     }
     return queueFamilyIndices;
 }
@@ -639,6 +646,26 @@ void createVertexBuffer() {
     vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
 }
 
+void createIndexBuffer() {
+    VkDeviceSize bufferSize = sizeof(uint16_t) * indices.size();
+    // Create staging buffer visible to host
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    // Copy indices to staging buffer as transfer soruce buffer, with host visible and coherent memory
+    void* data;
+    vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), (size_t)bufferSize);
+    vkUnmapMemory(logicalDevice, stagingBufferMemory);
+    // Create index buffer as transfer destination buffer, with device local memory
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+    // Copy from staging to index buffer
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    // Destroy staging buffer and free memory
+    vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
+    vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+}
+
 void createSyncObjects() {
     imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
     renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -725,8 +752,9 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     VkBuffer vertexBuffers[] = { vertexBuffer };
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     // Draw vertices
-    vkCmdDraw(commandBuffer, (uint32_t)vertices.size(), 1, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
     // End render pass
     vkCmdEndRenderPass(commandBuffer);
     res = vkEndCommandBuffer(commandBuffer);
@@ -802,6 +830,7 @@ int main() {
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
+    createIndexBuffer();
     allocateCommandBuffers();
     createSyncObjects();
     // Render loop
@@ -816,6 +845,8 @@ int main() {
         vkDestroySemaphore(logicalDevice, renderFinishedSemaphores[i], nullptr);
         vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
     }
+    vkDestroyBuffer(logicalDevice, indexBuffer, nullptr);
+    vkFreeMemory(logicalDevice, indexBufferMemory, nullptr);
     vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
     vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
     vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
