@@ -12,3 +12,4 @@ lib/
 *.user
 *.xcodeproj
 *.sln
+*.entitlements
