@@ -3,6 +3,7 @@ x64/
 .vscode/
 .vs/
 VulkanPlayground.xcodeproj/
+lib/
 *.xcodeproj/
 # Files
 .DS_STORE

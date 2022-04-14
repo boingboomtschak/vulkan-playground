@@ -1,6 +1,6 @@
 # Vulkan
 
-### 
+
 
 
 
@@ -77,3 +77,9 @@ A class representing a compatible physical device available on the system. Queri
 
 
 ##### Fence (VkFence)
+
+
+
+### Useful Tips
+
+- Copying directly to a vertex buffer set to be host-visible and host-coherent with the `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT` and `VK_MEMORY_PROPERTY_HOST_COHERENT_BIT` may not offer the best performance when the device has to read vertices. Rather, it may be more effective to create a temporary staging buffer with the usage flag `VK_BUFFER_USAGE_TRANSFER_SRC_BIT` and host-visible memory, copy vertices to that buffer, and then copy to a device local (`VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`) vertex buffer with usage flag `VK_BUFFER_USAGE_TRANSFER_DST_BIT`. That way, once the vertices are copied, they are faster to read and display by the device.
