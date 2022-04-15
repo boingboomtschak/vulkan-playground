@@ -6,8 +6,8 @@ layout(location = 2) in vec4 inColor;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    vec3 light = vec3(1, 1, 0);
-    float amb = 0.4, dif = 0.4, spc = 0.7;
+    vec3 light = vec3(2, 1, 0);
+    float amb = 0.2, dif = 0.4, spc = 0.4;
     vec3 N = normalize(inNormal);       // surface normal
     vec3 L = normalize(light-inPosition);  // light vector
     vec3 E = normalize(inPosition);        // eye vertex
