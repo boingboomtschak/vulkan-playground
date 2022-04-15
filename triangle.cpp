@@ -70,8 +70,8 @@ struct SwapchainSupportDetails {
 };
 
 struct Vertex {
-    glm::vec2 pos;
-    glm::vec3 color;
+    glm::vec3 pos;
+    glm::vec4 color;
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
         bindingDescription.binding = 0;
@@ -83,11 +83,11 @@ struct Vertex {
         std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
         attributeDescriptions[1].offset = offsetof(Vertex, color);
         return attributeDescriptions;
     }
@@ -100,14 +100,23 @@ struct UniformBufferObject {
 };
 
 const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 0.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f, 1.0f}},
+    {{0.5f, -0.5f, 0.5f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+    {{0.5f, 0.5f, 0.5f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.5f, 0.0f, 1.0f}},
 };
 
 const std::vector<uint16_t> indices = {
-    0, 1, 2, 2, 3, 0
+    2, 1, 0, 0, 3, 2, // front
+    7, 4, 5, 5, 6, 7, // back
+    6, 2, 3, 3, 7, 6, // top
+    4, 0, 1, 1, 5, 4, // bottom
+    6, 5, 1, 1, 2, 6, // right
+    3, 0, 4, 4, 7, 3 // left
 };
 
 static std::vector<char> readBinaryFile(const std::string& filename) {
