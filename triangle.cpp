@@ -71,6 +71,7 @@ struct SwapchainSupportDetails {
 
 struct Vertex {
     glm::vec3 pos;
+    glm::vec3 normal;
     glm::vec4 color;
     static VkVertexInputBindingDescription getBindingDescription() {
         VkVertexInputBindingDescription bindingDescription{};
@@ -80,15 +81,19 @@ struct Vertex {
         return bindingDescription;
     }
     static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
         attributeDescriptions[1].binding = 0;
         attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, normal);
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex, color);
         return attributeDescriptions;
     }
 };
@@ -100,23 +105,39 @@ struct UniformBufferObject {
 };
 
 const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f, 1.0f}},
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 0.0f, 1.0f}},
-    {{-0.5f, -0.5f, 0.5f}, {0.0f, 1.0f, 1.0f, 1.0f}},
-    {{0.5f, -0.5f, 0.5f}, {1.0f, 1.0f, 1.0f, 1.0f}},
-    {{0.5f, 0.5f, 0.5f}, {0.5f, 0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.5f, 0.0f, 1.0f}},
+    {{-1, -1, 1}, {0, 0, 1}, {1, 0, 0, 1}},
+    {{1, -1, 1}, {0, 0, 1}, {1, 0, 0, 1}},
+    {{1, 1, 1}, {0, 0, 1}, {1, 0, 0, 1}},
+    {{-1, 1, 1}, {0, 0, 1}, {1, 0, 0, 1}},
+    {{-1, -1, -1}, {0, 0, -1}, {0, 1, 0, 1}},
+    {{1, -1, -1}, {0, 0, -1}, {0, 1, 0, 1}},
+    {{1, 1, -1}, {0, 0, -1}, {0, 1, 0, 1}},
+    {{-1, 1, -1}, {0, 0, -1}, {0, 1, 0, 1}},
+    {{-1, -1, 1}, {-1, 0, 0}, {0, 0, 1, 1}},
+    {{-1, -1, -1}, {-1, 0, 0}, {0, 0, 1, 1}},
+    {{-1, 1, -1}, {-1, 0, 0}, {0, 0, 1, 1}},
+    {{-1, 1, 1}, {-1, 0, 0}, {0, 0, 1, 1}},
+    {{1, -1, 1}, {1, 0, 0}, {1, 1, 0, 1}},
+    {{1, -1, -1}, {1, 0, 0}, {1, 1, 0, 1}},
+    {{1, 1, -1}, {1, 0, 0}, {1, 1, 0, 1}},
+    {{1, 1, 1}, {1, 0, 0}, {1, 1, 0, 1}},
+    {{-1, 1, 1}, {0, 1, 0}, {0, 1, 1, 1}},
+    {{1, 1, 1}, {0, 1, 0}, {0, 1, 1, 1}},
+    {{1, 1, -1}, {0, 1, 0}, {0, 1, 1, 1}},
+    {{-1, 1, -1}, {0, 1, 0}, {0, 1, 1, 1}},
+    {{-1, -1, 1}, {0, -1, 0}, {1, 1, 1, 1}},
+    {{1, -1, 1}, {0, -1, 0}, {1, 1, 1, 1}},
+    {{1, -1, -1}, {0, -1, 0}, {1, 1, 1, 1}},
+    {{-1, -1, -1}, {0, -1, 0}, {1, 1, 1, 1}}
 };
 
 const std::vector<uint16_t> indices = {
-    2, 1, 0, 0, 3, 2, // front
-    7, 4, 5, 5, 6, 7, // back
-    6, 2, 3, 3, 7, 6, // top
-    4, 0, 1, 1, 5, 4, // bottom
-    6, 5, 1, 1, 2, 6, // right
-    3, 0, 4, 4, 7, 3 // left
+    0, 1, 2, 2, 3, 0, // front
+    6, 5, 4, 4, 7, 6, // back
+    10, 9, 8, 8, 11, 10, // left
+    12, 13, 14, 14, 15, 12, // right
+    16, 17, 18, 18, 19, 16, // top
+    22, 21, 20, 20, 23, 22 // bottom
 };
 
 static std::vector<char> readBinaryFile(const std::string& filename) {
@@ -830,7 +851,11 @@ void updateUniformBuffer(uint32_t currentImage) {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
     // Create UBO
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 model(1.0f);
+    model *= glm::scale(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.5f));
+    model *= glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    model *= glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.model = model;
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.0f);
     ubo.proj[1][1] *= -1;
