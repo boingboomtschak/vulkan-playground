@@ -22,7 +22,7 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-const std::string textureFilename = "textures/etretat.jpg";
+const std::string TEX_FILENAME = "textures/l'ete.jpg";
 
 uint32_t currentFrame = 0;
 bool framebufferResized = false;
@@ -117,33 +117,33 @@ struct UniformBufferObject {
 
 const std::vector<Vertex> vertices = {
     //  POS          NORMAL       COLOR        UV
-    {{-1, -1, 1},  {0, 0, 1},  {1, 0, 0, 1}, {0, 0}},
-    {{1, -1, 1},   {0, 0, 1},  {1, 0, 0, 1}, {1, 0}},
-    {{1, 1, 1},    {0, 0, 1},  {1, 0, 0, 1}, {1, 1}},
-    {{-1, 1, 1},   {0, 0, 1},  {1, 0, 0, 1}, {0, 1}},
-    {{-1, -1, -1}, {0, 0, -1}, {0, 1, 0, 1}, {0, 0}},
-    {{1, -1, -1},  {0, 0, -1}, {0, 1, 0, 1}, {1, 0}},
-    {{1, 1, -1},   {0, 0, -1}, {0, 1, 0, 1}, {1, 1}},
-    {{-1, 1, -1},  {0, 0, -1}, {0, 1, 0, 1}, {0, 1}},
-    {{-1, -1, 1},  {-1, 0, 0}, {0, 0, 1, 1}, {0, 0}},
-    {{-1, -1, -1}, {-1, 0, 0}, {0, 0, 1, 1}, {1, 0}},
-    {{-1, 1, -1},  {-1, 0, 0}, {0, 0, 1, 1}, {1, 1}},
-    {{-1, 1, 1},   {-1, 0, 0}, {0, 0, 1, 1}, {0, 1}},
-    {{1, -1, 1},   {1, 0, 0},  {1, 1, 0, 1}, {0, 0}},
-    {{1, -1, -1},  {1, 0, 0},  {1, 1, 0, 1}, {1, 0}},
-    {{1, 1, -1},   {1, 0, 0},  {1, 1, 0, 1}, {1, 1}},
-    {{1, 1, 1},    {1, 0, 0},  {1, 1, 0, 1}, {0, 1}},
-    {{-1, 1, 1},   {0, 1, 0},  {0, 1, 1, 1}, {0, 0}},
-    {{1, 1, 1},    {0, 1, 0},  {0, 1, 1, 1}, {1, 0}},
-    {{1, 1, -1},   {0, 1, 0},  {0, 1, 1, 1}, {1, 1}},
-    {{-1, 1, -1},  {0, 1, 0},  {0, 1, 1, 1}, {0, 1}},
-    {{-1, -1, 1},  {0, -1, 0}, {1, 0, 1, 1}, {0, 0}},
-    {{1, -1, 1},   {0, -1, 0}, {1, 0, 1, 1}, {1, 0}},
-    {{1, -1, -1},  {0, -1, 0}, {1, 0, 1, 1}, {1, 1}},
-    {{-1, -1, -1}, {0, -1, 0}, {1, 0, 1, 1}, {0, 1}}
+    {{-1, -1, 1},  {0, 0, 1},  {1, 0, 0, 1}, {1, 1}},
+    {{1, -1, 1},   {0, 0, 1},  {1, 0, 0, 1}, {0, 1}},
+    {{1, 1, 1},    {0, 0, 1},  {1, 0, 0, 1}, {0, 0}},
+    {{-1, 1, 1},   {0, 0, 1},  {1, 0, 0, 1}, {1, 0}},
+    {{-1, -1, -1}, {0, 0, -1}, {0, 1, 0, 1}, {1, 1}},
+    {{1, -1, -1},  {0, 0, -1}, {0, 1, 0, 1}, {0, 1}},
+    {{1, 1, -1},   {0, 0, -1}, {0, 1, 0, 1}, {0, 0}},
+    {{-1, 1, -1},  {0, 0, -1}, {0, 1, 0, 1}, {1, 0}},
+    {{-1, -1, 1},  {-1, 0, 0}, {0, 0, 1, 1}, {1, 1}},
+    {{-1, -1, -1}, {-1, 0, 0}, {0, 0, 1, 1}, {0, 1}},
+    {{-1, 1, -1},  {-1, 0, 0}, {0, 0, 1, 1}, {0, 0}},
+    {{-1, 1, 1},   {-1, 0, 0}, {0, 0, 1, 1}, {1, 0}},
+    {{1, -1, 1},   {1, 0, 0},  {1, 1, 0, 1}, {1, 1}},
+    {{1, -1, -1},  {1, 0, 0},  {1, 1, 0, 1}, {0, 1}},
+    {{1, 1, -1},   {1, 0, 0},  {1, 1, 0, 1}, {0, 0}},
+    {{1, 1, 1},    {1, 0, 0},  {1, 1, 0, 1}, {1, 0}},
+    {{-1, 1, 1},   {0, 1, 0},  {0, 1, 1, 1}, {1, 1}},
+    {{1, 1, 1},    {0, 1, 0},  {0, 1, 1, 1}, {0, 1}},
+    {{1, 1, -1},   {0, 1, 0},  {0, 1, 1, 1}, {0, 0}},
+    {{-1, 1, -1},  {0, 1, 0},  {0, 1, 1, 1}, {1, 0}},
+    {{-1, -1, 1},  {0, -1, 0}, {1, 0, 1, 1}, {1, 1}},
+    {{1, -1, 1},   {0, -1, 0}, {1, 0, 1, 1}, {0, 1}},
+    {{1, -1, -1},  {0, -1, 0}, {1, 0, 1, 1}, {0, 0}},
+    {{-1, -1, -1}, {0, -1, 0}, {1, 0, 1, 1}, {1, 0}}
 };
 
-const std::vector<uint16_t> indices = {
+const std::vector<uint32_t> indices = {
 	0, 1, 2, 2, 3, 0, // front
 	6, 5, 4, 4, 7, 6, // back
 	10, 9, 8, 8, 11, 10, // left
@@ -820,10 +820,10 @@ void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling
 void createTextureImage() {
     // Reading image from file
     int tWidth, tHeight, tChannels;
-    stbi_uc* pixels = stbi_load(textureFilename.c_str(), &tWidth, &tHeight, &tChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load(TEX_FILENAME.c_str(), &tWidth, &tHeight, &tChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = tWidth * tHeight * 4;
     if (!pixels)
-        throw std::runtime_error("Failed to load texture '" + textureFilename + "'!");
+        throw std::runtime_error("Failed to load texture '" + TEX_FILENAME + "'!");
     // Creating staging buffer
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -895,7 +895,7 @@ void createVertexBuffer() {
 }
 
 void createIndexBuffer() {
-	VkDeviceSize bufferSize = sizeof(uint16_t) * indices.size();
+	VkDeviceSize bufferSize = sizeof(uint32_t) * indices.size();
 	// Create staging buffer visible to host
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -1110,7 +1110,7 @@ void drawFrame() {
 	VkBuffer vertexBuffers[] = { vertexBuffer };
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, vertexBuffers, offsets);
-	vkCmdBindIndexBuffer(commandBuffers[currentFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(commandBuffers[currentFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 	// Draw vertices
 	vkCmdDrawIndexed(commandBuffers[currentFrame], (uint32_t)indices.size(), 1, 0, 0, 0);
