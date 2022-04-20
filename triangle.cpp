@@ -3,7 +3,7 @@
 #include <VecMat.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#include <chrono>
+#include <time.h>
 #include <vector>
 #include <set>
 #include <string>
@@ -11,7 +11,6 @@
 #include <stdexcept>
 #include <optional>
 #include <limits>
-#include <algorithm>
 #include <fstream>
 
 #pragma warning(disable : 26812) // Disable enum class warning from Vulkan enums
@@ -22,9 +21,10 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-const std::string TEX_FILENAME = "textures/l'ete.jpg";
+const std::string TEX_FILENAME = "textures/etude-de-tete.jpg";
 
 uint32_t currentFrame = 0;
+time_t startTime = clock();
 bool framebufferResized = false;
 float size = 0.5f;
 
@@ -116,7 +116,7 @@ struct UniformBufferObject {
 };
 
 const std::vector<Vertex> vertices = {
-    //  POS          NORMAL       COLOR        UV
+    //   POS         NORMAL       COLOR        UV
     {{-1, -1, 1},  {0, 0, 1},  {1, 0, 0, 1}, {1, 1}},
     {{1, -1, 1},   {0, 0, 1},  {1, 0, 0, 1}, {0, 1}},
     {{1, 1, 1},    {0, 0, 1},  {1, 0, 0, 1}, {0, 0}},
@@ -152,6 +152,9 @@ const std::vector<uint32_t> indices = {
 	22, 21, 20, 20, 23, 22 // bottom
 };
 
+float clamp(float val, float min, float max) { float _val = val < min ? min : val; return _val > max ? max : _val; }
+uint32_t clamp(uint32_t val, uint32_t min, uint32_t max) { uint32_t _val = val < min ? min : val; return _val > max ? max : _val; }
+
 static std::vector<char> readBinaryFile(const std::string& filename) {
 	std::ifstream file;
 	file.open(filename, std::ios::ate | std::ios::binary);
@@ -174,7 +177,7 @@ void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
 }
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-	size = std::clamp((float)(size + 0.01 * yoffset), 0.01f, 1.0f);
+	size = clamp((float)(size + 0.01 * yoffset), 0.01f, 1.0f);
 }
 
 QueueFamilyIndices getQueueFamilies(VkPhysicalDevice device) {
@@ -381,8 +384,8 @@ void createSwapchain() {
 	if (extent.width == std::numeric_limits<uint32_t>::max()) {
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-		extent.width = std::clamp((uint32_t)width, swapChainSupport.capabilities.minImageExtent.width, swapChainSupport.capabilities.maxImageExtent.width);
-		extent.height = std::clamp((uint32_t)height, swapChainSupport.capabilities.minImageExtent.height, swapChainSupport.capabilities.maxImageExtent.height);
+		extent.width = clamp((uint32_t)width, swapChainSupport.capabilities.minImageExtent.width, swapChainSupport.capabilities.maxImageExtent.width);
+		extent.height = clamp((uint32_t)height, swapChainSupport.capabilities.minImageExtent.height, swapChainSupport.capabilities.maxImageExtent.height);
 	}
 	// Query reasonable image count
 	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -1046,29 +1049,16 @@ void recreateSwapchain() {
 	allocateCommandBuffers();
 }
 
-void updateUniformBuffer(uint32_t currentImage) {
-	static auto startTime = std::chrono::high_resolution_clock::now();
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-	// Create UBO
-	UniformBufferObject ubo{};
-	mat4 model;
-	model = model*Scale(size, size, size);
-	model = model*RotateY(time * 90.0f);
-	model = model*RotateX(time * 90.0f);
-	ubo.model = model;
-	ubo.view = Transpose(LookAt(vec3(2, 2, 2), vec3(0, 0, 0), vec3(0, 0, 1)));
-	ubo.proj = Transpose(Perspective(45, swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.0f));
-	ubo.proj[1][1] *= -1;
-	// Copy UBO to current uniform buffer
+void copyUniformBuffer(UniformBufferObject ubo, VkDeviceMemory bufferMem) {
 	void* data;
-	vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+	vkMapMemory(logicalDevice, bufferMem, 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
-	vkUnmapMemory(logicalDevice, uniformBuffersMemory[currentImage]);
+	vkUnmapMemory(logicalDevice, bufferMem);
 }
 
 void drawFrame() {
 	VkResult res;
+	VkDeviceSize offset = 0;
 	// Wait for frame to stop being in flight
 	vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 	// Acquire next swapchain image
@@ -1082,18 +1072,13 @@ void drawFrame() {
 		throw std::runtime_error("Failed to acquire swapchain image!");
 	// Reset in flight fences so next frame can begin rendering
 	vkResetFences(logicalDevice, 1, &inFlightFences[currentFrame]);
-	// Reset and record command buffer
-	vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-	// Begin recording to command buffer
+	// Setup command buffer to begin
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = 0;
 	beginInfo.pInheritanceInfo = nullptr;
-	res = vkBeginCommandBuffer(commandBuffers[currentFrame], &beginInfo);
-	if (res != VK_SUCCESS)
-		throw std::runtime_error("Failed to begin recording to command buffer!");
-	VkClearValue clearColor = {{{ 0.0f, 0.0f, 0.0f, 1.0f }}};
 	// Setup render pass
+	VkClearValue clearColor = { {{ 0.0f, 0.0f, 0.0f, 1.0f }} };
 	VkRenderPassBeginInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassInfo.renderPass = renderPass;
@@ -1102,24 +1087,30 @@ void drawFrame() {
 	renderPassInfo.renderArea.extent = swapchainExtent;
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;
-	// Begin render pass
-	vkCmdBeginRenderPass(commandBuffers[currentFrame], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	// Bind graphics pipeline
+	// Create and copy UBO
+	time_t now = clock();
+	float dt = (float)(now - startTime) / CLOCKS_PER_SEC;
+	UniformBufferObject ubo{};
+	ubo.model = Scale(size, size, size) * RotateY(dt * 90.0f) * RotateX(dt * 90.0f);
+	ubo.view = Transpose(LookAt(vec3(2, 2, 2), vec3(0, 0, 0), vec3(0, 0, 1)));
+	ubo.proj = Transpose(Perspective(45, swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f));
+	ubo.proj[1][1] *= -1;
+	copyUniformBuffer(ubo, uniformBuffersMemory[currentFrame]);
+	// Bind graphics pipeline and other drawing resources
+	vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+	res = vkBeginCommandBuffer(commandBuffers[currentFrame], &beginInfo);
+	if (res != VK_SUCCESS)
+		throw std::runtime_error("Failed to begin recording to command buffer!");
 	vkCmdBindPipeline(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-	// Bind vertex buffer
-	VkBuffer vertexBuffers[] = { vertexBuffer };
-	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, vertexBuffers, offsets);
+	vkCmdBindVertexBuffers(commandBuffers[currentFrame], 0, 1, &vertexBuffer, &offset);
 	vkCmdBindIndexBuffer(commandBuffers[currentFrame], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-	// Draw vertices
+	vkCmdBeginRenderPass(commandBuffers[currentFrame], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdDrawIndexed(commandBuffers[currentFrame], (uint32_t)indices.size(), 1, 0, 0, 0);
-	// End render pass
 	vkCmdEndRenderPass(commandBuffers[currentFrame]);
 	res = vkEndCommandBuffer(commandBuffers[currentFrame]);
 	if (res != VK_SUCCESS)
 		throw std::runtime_error("Failed to finalize recording command buffer!");
-	updateUniformBuffer(currentFrame);
 	// Submit command buffer
 	VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
