@@ -3,7 +3,7 @@
 #include <VecMat.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-#include <time.h>
+#include <chrono>
 #include <vector>
 #include <set>
 #include <string>
@@ -23,8 +23,11 @@ const std::vector<const char*> deviceExtensions = {
 };
 const std::string TEX_FILENAME = "textures/etude-de-tete.jpg";
 
+typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::seconds::period Period;
+
 uint32_t currentFrame = 0;
-time_t startTime = clock();
+time_t startTime = time(NULL);
 bool framebufferResized = false;
 float size = 0.5f;
 
@@ -1088,9 +1091,10 @@ void drawFrame() {
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearColor;
 	// Create and copy UBO
-	time_t now = clock();
-	float dt = (float)(now - startTime) / CLOCKS_PER_SEC;
-	UniformBufferObject ubo{};
+    static Clock::time_point startTime = Clock::now();
+    Clock::time_point now = Clock::now();
+    float dt = std::chrono::duration<float, Period>(now - startTime).count();
+    UniformBufferObject ubo{};
 	ubo.model = Scale(size, size, size) * RotateY(dt * 90.0f) * RotateX(dt * 90.0f);
 	ubo.view = Transpose(LookAt(vec3(2, 2, 2), vec3(0, 0, 0), vec3(0, 0, 1)));
 	ubo.proj = Transpose(Perspective(45, swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.0f));
