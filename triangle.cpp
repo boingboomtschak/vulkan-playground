@@ -1,8 +1,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <VecMat.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <VecMat.h>
+
 #include <chrono>
 #include <vector>
 #include <set>
@@ -21,13 +22,12 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-const std::string TEX_FILENAME = "textures/etude-de-tete.jpg";
+const std::string TEX_FILENAME = "textures/l'ete.jpg";
 
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::seconds::period Period;
 
 uint32_t currentFrame = 0;
-time_t startTime = time(NULL);
 bool framebufferResized = false;
 float size = 0.5f;
 
