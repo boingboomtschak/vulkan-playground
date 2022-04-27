@@ -156,6 +156,8 @@ struct Application {
     VkDeviceMemory dstImageMemory;
     VkImageView dstImageView;
     VkSampler dstSampler;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
     void createInstance() {
         VkApplicationInfo appInfo{};
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -446,7 +448,7 @@ struct Application {
         bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
         descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        descriptorLayoutInfo.bindingCount = bindings.size();
+        descriptorLayoutInfo.bindingCount = (uint32_t)bindings.size();
         descriptorLayoutInfo.pBindings = bindings.data();
         if (vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &graphicsDescriptorSetLayout) != VK_SUCCESS)
             throw runtime_error("Failed to create graphics descriptor set layout!");
@@ -703,7 +705,20 @@ struct Application {
         createImage(srcWidth, srcHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, dstImage, dstImageMemory);
         dstImageView = createImageView(dstImage, VK_FORMAT_R8G8B8A8_SRGB);
     }
-    
+    void createVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(Vertex) * vertices.size();
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
     void initialize() {
         createInstance();
         createSurface();
@@ -715,6 +730,7 @@ struct Application {
         createComputePipeline();
         createFramebuffers();
         createCommandPool();
+        createVertexBuffer();
     }
     void compute() {
         
@@ -722,7 +738,8 @@ struct Application {
     void present() {
         if (srcImage != VK_NULL_HANDLE) {
             uint32_t imageIndex;
-            VkResult res = vkAcquireNextImageKHR(device, swapchain.chain, UINT64_MAX, VK_NULL_HANDLE, VK_NULL_HANDLE, &imageIndex);
+            if (vkAcquireNextImageKHR(device, swapchain.chain, UINT64_MAX, VK_NULL_HANDLE, VK_NULL_HANDLE, &imageIndex) != VK_SUCCESS)
+                throw runtime_error("Failed to acquire next swapchain image!");
             
             
             VkPresentInfoKHR presentInfo{};
@@ -746,6 +763,8 @@ struct Application {
             vkFreeMemory(device, dstImageMemory, nullptr);
             vkDestroyImageView(device, dstImageView, nullptr);
         }
+        vkDestroyBuffer(device, vertexBuffer, nullptr);
+        vkFreeMemory(device, vertexBufferMemory, nullptr);
         vkDestroyCommandPool(device, commandPool, nullptr);
         for (VkFramebuffer framebuffer : swapchain.framebuffers)
             vkDestroyFramebuffer(device, framebuffer, nullptr);
