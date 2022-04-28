@@ -23,6 +23,7 @@ using std::string;
 
 const uint32_t WIN_WIDTH = 800;
 const uint32_t WIN_HEIGHT = 800;
+const int MAX_CPU_PROCESSED_FRAMES = 2;
 const vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
@@ -145,8 +146,12 @@ struct Application {
     Swapchain swapchain;
     VkRenderPass renderPass;
     VkDescriptorSetLayout graphicsDescriptorSetLayout;
+    VkDescriptorPool graphicsDescriptorPool;
+    vector<VkDescriptorSet> graphicsDescriptorSets;
     VkPipeline graphicsPipeline;
     VkDescriptorSetLayout computeDescriptorSetLayout;
+    VkDescriptorPool computeDescriptorPool;
+    vector<VkDescriptorSet> computeDescriptorSets;
     VkPipeline computePipeline;
     VkCommandPool commandPool;
     VkImage srcImage = VK_NULL_HANDLE;
@@ -719,6 +724,45 @@ struct Application {
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
+    void createDescriptorPool() {
+        vector<VkDescriptorPoolSize> poolSizes(1);
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[0].descriptorCount = (uint32_t)MAX_CPU_PROCESSED_FRAMES;
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = (uint32_t)poolSizes.size();
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = (uint32_t)MAX_CPU_PROCESSED_FRAMES;
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &graphicsDescriptorPool) != VK_SUCCESS)
+            throw runtime_error("Failed to create graphics descriptor pool!");
+    }
+    void allocateDescriptorSets() {
+        vector<VkDescriptorSetLayout> layouts(MAX_CPU_PROCESSED_FRAMES, graphicsDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = graphicsDescriptorPool;
+        allocInfo.descriptorSetCount = (uint32_t)MAX_CPU_PROCESSED_FRAMES;
+        allocInfo.pSetLayouts = layouts.data();
+        graphicsDescriptorSets.resize(MAX_CPU_PROCESSED_FRAMES);
+        if (vkAllocateDescriptorSets(device, &allocInfo, graphicsDescriptorSets.data()) != VK_SUCCESS)
+            throw runtime_error("Failed to allocate graphics descriptor sets!");
+        for (size_t i = 0; i < MAX_CPU_PROCESSED_FRAMES; i++) {
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = dstImageView;
+            imageInfo.sampler = dstSampler;
+            vector<VkWriteDescriptorSet> descriptorWrites(1);
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = graphicsDescriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pImageInfo = &imageInfo;
+            vkUpdateDescriptorSets(device, (uint32_t)descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+        }
+    }
     void initialize() {
         createInstance();
         createSurface();
@@ -731,6 +775,8 @@ struct Application {
         createFramebuffers();
         createCommandPool();
         createVertexBuffer();
+        createDescriptorPool();
+        allocateDescriptorSets();
     }
     void compute() {
         
@@ -763,6 +809,7 @@ struct Application {
             vkFreeMemory(device, dstImageMemory, nullptr);
             vkDestroyImageView(device, dstImageView, nullptr);
         }
+        vkDestroyDescriptorPool(device, graphicsDescriptorPool, nullptr);
         vkDestroyBuffer(device, vertexBuffer, nullptr);
         vkFreeMemory(device, vertexBufferMemory, nullptr);
         vkDestroyCommandPool(device, commandPool, nullptr);
